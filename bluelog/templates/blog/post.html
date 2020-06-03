@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+{% from 'bootstrap/form.html' import render_form %}
+{% from 'bootstrap/pagination.html' import render_pagination %}
+
+{% block title %}{{ post.title }}{% endblock title %}
+
+{% block content %}
+    <div class="page-header">
+        <h1>{{ post.title }}</h1>
+        <small>
+            分类: <a href="{{ url_for('.show_category', category_id=post.category.id) }}">{{ post.category.name }}</a><br>
+            日期: {{ moment(post.timestamp).format("LL") }}
+        </small>
+    </div>
+    <div class="row">
+        <div class="col-sm-8">
+            {{ post.body|safe }}
+            <div class="comments" id="comments">
+                <h3>{{ pagination.total }} 评论<!-- 使用pagination.total获取分页条目总数 -->
+                    <small>
+                        <a href="{{ url_for('.show_post', post_id=post.id, page=pagination.pages or 1) }}#comments">最新</a>
+                    </small>
+                    {% if current_user.is_authenticated %}
+                        <form class="float-right" method="post" action="{{ url_for('admin.set_comment', post_id=post.id, next=request.full_path) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button>{% if post.can_comment %}
+                                不可以
+                            {% else %}
+                                可以
+                            {% endif %} 评论</button>
+                        </form>
+                    {% endif %}
+                </h3>
+                {% if comments %}
+                    <ul class="list-group">
+                        {% for comment in comments %}
+                            <li class="list-group-item list-group-item-action flex-column">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h5 class="mb-1">
+                                        <a href="{% if comment.site %}{{ comment.site }}{% else %}#{% endif %} "
+                                           target="_blank">
+                                            {% if comment.from_admin %}
+                                                {{ admin.name }}
+                                            {% else %}
+                                                {{ comment.author }}
+                                            {% endif %}
+                                        </a>
+                                        {% if comment.from_admin %}
+                                            <sapn class="badge badge-primary">作者</sapn>
+                                        {% endif %}
+                                        {% if comment.replied %}
+                                            <span class="badge badge-light">回复</span>
+                                        {% endif %}
+                                    </h5>
+                                    <small data-toggle="tooltip" data-placement="top" data-delag="500"
+                                           data-timestamp="{{ comment.timestamp.strftime('%Y-%m-%dT%H:%M:%SZ') }}">{{ moment(comment.timestamp).fromNow() }}</small>
+                                </div>
+                                {% if comment.replied %}
+                                    <p class="alert alert-dark reply-body">{{ comment.replied.author }}:<br>{{ comment.replied.body }}
+                                    </p>
+                                {% endif %}
+                                <p class="mb-1">{{ comment.body }}</p>
+                                <div class="float-right">
+                                    <a class="btn btn-light btn-sm"
+                                       href="{{ url_for('.reply_comment', comment_id=comment.id) }}">回复</a>
+                                    {% if current_user.is_authenticated %}
+                                        <a class="btn btn-light btn-sm" href="mailto:{{ comment.email }}">邮件</a>
+                                        <form class="inline" method="post"
+                                              action="{{ url_for('admin.delete_comment',comment_id=comment.id, next=request.full_path) }}">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-danger btn-sm"
+                                                    onclick="return confirm('确认删除吗?')">删除
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="tip"><h5>没有评论</h5></div>
+                {% endif %}
+            </div>
+            {% if comments %}
+                {{ render_pagination(pagination, fragment='#comments') }}
+            {% endif %}
+            {% if request.args.get('reply') %}
+                <div class="alert alert-dark">
+                    回复<strong>{{ request.args.get('author') }}</strong>:
+                    <a class="float-right" href="{{ url_for('.show_post', post_id=post.id) }}">取消</a>
+                </div>
+            {% endif %}
+            {% if post.can_comment %}
+                <div id="comment-form">
+                    {{ render_form(form, action=request.full_path) }}
+                </div>
+            {% else %}
+                <div class="tip"><h5>不可以评论</h5></div>
+            {% endif %}
+        </div>
+        <div class="col-sm-4 sidebar">
+            {% include "blog/_sidebar.html" %}
+        </div>
+    </div>
+{% endblock content %}
